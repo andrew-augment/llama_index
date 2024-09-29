@@ -235,14 +235,18 @@ class VectorStoreIndex(BaseIndex[IndexDict]):
                 # NOTE: if the vector store doesn't store text,
                 # we need to add the nodes to the index struct and document store
                 for node, new_id in zip(nodes_batch, new_ids):
-                    # NOTE: remove embedding from node to avoid duplication
-                    node_without_embedding = node.model_copy()
-                    node_without_embedding.embedding = None
+                    # NOTE: Check if node has already pre-computed embeddings
+                    # This avoids missing them when added to the docstore
+                    if node.embedding:
+                        node_to_insert = node
+                    else:
+                        # NOTE: remove embedding from node to avoid duplication
+                        node_without_embedding = node.model_copy()
+                        node_without_embedding.embedding = None
+                        node_to_insert = node_without_embedding
 
-                    index_struct.add_node(node_without_embedding, text_id=new_id)
-                    self._docstore.add_documents(
-                        [node_without_embedding], allow_update=True
-                    )
+                    index_struct.add_node(node_to_insert, text_id=new_id)
+                    self._docstore.add_documents([node_to_insert], allow_update=True)
             else:
                 # NOTE: if the vector store keeps text,
                 # we only need to add image and index nodes
